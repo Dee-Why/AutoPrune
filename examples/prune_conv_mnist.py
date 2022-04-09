@@ -113,54 +113,31 @@ def exp():
     result = []
     net = LeNet()
     net_orig = deepcopy(net)
-
-    print("------------------------------pretrained_model------------------------------")
-    # 预训练的网络
     batch_size = 128
-    print(net)
-    train_iter, test_iter = load_data_fashion_mnist(batch_size, resize=15) # 如出现“out of memory”的报错信息，可减小batch_size或resize
-    lr, num_epochs = 0.001, 20
-    optimizer = torch.optim.Adam(net.parameters(), lr=lr)
-    res = train_ch5(net, train_iter, test_iter, batch_size, optimizer, device, num_epochs)
-    result.append(res)
-    print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^pretrained_model_ends^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
-
-
     print("------------------------------pruned_model_from_scratch------------------------------")
-    # 用训练好的神经网络进行L1选择idxs
+    # 全网络剪枝
+    idxs = {}
     strategy = tp.strategy.L1Strategy()
-    idxs = strategy(net.fc1.weight, amount=0.4)
-    # idxs作用于未训练的网络上
+    static_layer = ['4']
+    for i, layer in net.fc.named_children():
+        if i not in static_layer:
+            if isinstance(layer, nn.Linear):
+                idxs[i] = strategy(layer.weight, amount = 0.4)
     DG = tp.DependencyGraph()
-    DG.build_dependency(net_orig, example_inputs=torch.randn(1,225))
+    DG.build_dependency(net, example_inputs=torch.randn(1,1,28,28))
     pruning_plan = DG.get_pruning_plan( net_orig.fc1, tp.prune_linear, idxs=idxs)
     print(pruning_plan)
     # execute the plan (prune the model)
     pruning_plan.exec()
     print(net_orig)
     # train from scratch
-    train_iter, test_iter = load_data_fashion_mnist(batch_size, resize=15)
+    train_iter, test_iter = load_data_fashion_mnist(batch_size)
     lr, num_epochs = 0.001, 30
     optimizer = torch.optim.Adam(net_orig.parameters(), lr=lr)
     res = train_ch5(net_orig, train_iter, test_iter, batch_size, optimizer, device, num_epochs)
     result.append(res)
     print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^pruned_model_from_scratch_ends^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
 
-    print("------------------------------pruned_model_fine_tune------------------------------")
-    DG = tp.DependencyGraph()
-    DG.build_dependency(net, example_inputs=torch.randn(1,225))
-    pruning_plan = DG.get_pruning_plan(net.fc1, tp.prune_linear, idxs=idxs)
-    print(pruning_plan)
-    pruning_plan.exec()
-    print(net)
-    train_iter, test_iter = load_data_fashion_mnist(batch_size, resize=15) # 如出现“out of memory”的报错信息，可减小batch_size或resize
-    lr, num_epochs = 0.001, 10
-    optimizer = torch.optim.Adam(net.parameters(), lr=lr)
-    res = train_ch5(net, train_iter, test_iter, batch_size, optimizer, device, num_epochs)
-    res['incumbent_epoch'] += 20
-    result.append(res)
-    print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^pruned_model_fine_tune_ends^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
-    return result
 
-if __name__ == '__main__':
-    exp()
+# if __name__ == '__main__':
+#     exp()
