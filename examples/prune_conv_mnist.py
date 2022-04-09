@@ -15,16 +15,29 @@ import torch_pruning as tp
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-class FullyConnectedNet(nn.Module):
-    def __init__(self, input_size, num_classes, HIDDEN_UNITS):
-        super().__init__()
-        self.fc1 = nn.Linear(input_size, HIDDEN_UNITS)
-        self.fc2 = nn.Linear(HIDDEN_UNITS, num_classes)
-
-    def forward(self, x):
-        x = F.relu(self.fc1(x))
-        y_hat = self.fc2(x)
-        return y_hat
+class LeNet(nn.Module):
+    def __init__(self):
+        super(LeNet, self).__init__()
+        self.conv = nn.Sequential(
+            nn.Conv2d(1,6,5),
+            nn.Sigmoid(),
+            nn.MaxPool2d(2,2),
+            nn.Conv2d(6,16,5),
+            nn.Sigmoid(),
+            nn.MaxPool2d(2,2)
+        )
+        self.fc = nn.Sequential(
+            nn.Linear(16*4*4, 120),
+            nn.Sigmoid(),
+            nn.Linear(120, 84),
+            nn.Sigmoid(),
+            nn.Linear(84, 10)
+        )
+        
+    def forward(self, img):
+        feature = self.conv(img)
+        output = self.fc(feature.view(img.shape[0], -1))
+        return output
 
 
 
@@ -34,7 +47,7 @@ def load_data_fashion_mnist(batch_size, resize=None, root='~/Datasets'):
     if resize:
         trans.append(torchvision.transforms.Resize(size=resize))
     trans.append(torchvision.transforms.ToTensor())
-    trans.append(torchvision.transforms.Lambda(lambda x: torch.flatten(x)))
+    # trans.append(torchvision.transforms.Lambda(lambda x: torch.flatten(x)))
     transform = torchvision.transforms.Compose(trans)
     
     mnist_train = torchvision.datasets.FashionMNIST(root=root, train=True, download=True, transform=transform)
@@ -98,9 +111,8 @@ def train_ch5(net, train_iter, test_iter, batch_size, optimizer, device, num_epo
 
 def exp():
     result = []
-    net = FullyConnectedNet(225, 10, 512)
+    net = LeNet()
     net_orig = deepcopy(net)
-    net_random = FullyConnectedNet(225,10,math.ceil(512*(1-0.4)))
 
     print("------------------------------pretrained_model------------------------------")
     # 预训练的网络
@@ -133,15 +145,6 @@ def exp():
     res = train_ch5(net_orig, train_iter, test_iter, batch_size, optimizer, device, num_epochs)
     result.append(res)
     print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^pruned_model_from_scratch_ends^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
-
-    print("------------------------------random_model------------------------------")
-    print(net_random)
-    train_iter, test_iter = load_data_fashion_mnist(batch_size, resize=15)
-    lr, num_epochs = 0.001, 30
-    optimizer = torch.optim.Adam(net_random.parameters(), lr=lr)
-    res = train_ch5(net_random, train_iter, test_iter, batch_size, optimizer, device, num_epochs)
-    result.append(res)
-    print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^random_model^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
 
     print("------------------------------pruned_model_fine_tune------------------------------")
     DG = tp.DependencyGraph()
