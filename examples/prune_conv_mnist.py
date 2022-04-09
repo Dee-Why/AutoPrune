@@ -109,6 +109,19 @@ def train_ch5(net, train_iter, test_iter, batch_size, optimizer, device, num_epo
     return {'incumbent_epoch': incumbent_epoch, 'incumbent_test_accuracy': incumbent_test_accuracy}
 
 
+def prune_model(model):
+    model.cpu()
+    DG = tp.DependencyGraph().build_dependency(model, torch.randn(1, 1, 28, 28))
+    def prune_conv(conv, amount=0.2):
+        strategy = tp.strategy.L1Strategy()
+        pruning_index = strategy(conv.weight, amount=amount)
+        plan = DG.get_pruning_plan(conv, tp.prune_conv, pruning_index)
+        plan.exec()
+    for m in model.modules():
+        if isinstance(m, nn.Conv2d):
+            prune_conv(m, 0.2)
+    return model
+
 def exp():
     result = []
     net = LeNet()
@@ -132,12 +145,15 @@ def exp():
         if name in idxs:
             pruning_plans.append(DG.get_pruning_plan(module, tp.prune_linear, idxs=idxs[name]))
 
-    pruning_plans
+    print(pruning_plans)
 
     print(net)
 
     for plan in pruning_plans:
         plan.exec()
+    print(net)
+
+    prune_model(net)
     print(net)
 
     # train from scratch
