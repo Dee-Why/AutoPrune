@@ -114,6 +114,7 @@ def exp():
     net = LeNet()
     net_orig = deepcopy(net)
     batch_size = 128
+
     print("------------------------------pruned_model_from_scratch------------------------------")
     # 全网络剪枝
     idxs = {}
@@ -124,20 +125,28 @@ def exp():
             if isinstance(layer, nn.Linear):
                 idxs[i] = strategy(layer.weight, amount = 0.4)
     DG = tp.DependencyGraph()
-    DG.build_dependency(net, example_inputs=torch.randn(1,1,28,28))
-    pruning_plan = DG.get_pruning_plan( net_orig.fc1, tp.prune_linear, idxs=idxs)
-    print(pruning_plan)
-    # execute the plan (prune the model)
-    pruning_plan.exec()
-    print(net_orig)
+    DG.build_dependency(net.fc, example_inputs=torch.randn(1,16*4*4))
+
+    pruning_plans = []
+    for name, module in net.fc.named_children():
+        if name in idxs:
+            pruning_plans.append(DG.get_pruning_plan(module, tp.prune_linear, idxs=idxs[name]))
+
+    pruning_plans
+
+    print(net)
+
+    for plan in pruning_plans:
+        plan.exec()
+    print(net)
+
     # train from scratch
     train_iter, test_iter = load_data_fashion_mnist(batch_size)
-    lr, num_epochs = 0.001, 30
-    optimizer = torch.optim.Adam(net_orig.parameters(), lr=lr)
-    res = train_ch5(net_orig, train_iter, test_iter, batch_size, optimizer, device, num_epochs)
-    result.append(res)
+    lr, num_epochs = 0.001, 10
+    optimizer = torch.optim.Adam(net.parameters(), lr=lr)
+    res = train_ch5(net, train_iter, test_iter, batch_size, optimizer, device, num_epochs)
+    print(res)
     print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^pruned_model_from_scratch_ends^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
 
-
-# if __name__ == '__main__':
-#     exp()
+if __name__ == '__main__':
+    exp()
