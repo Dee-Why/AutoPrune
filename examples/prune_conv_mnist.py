@@ -40,7 +40,6 @@ class LeNet(nn.Module):
         return output
 
 
-
 def load_data_fashion_mnist(batch_size, resize=None, root='~/Datasets'):
     """Download the fashion mnist dataset and then load into memory."""
     trans = []
@@ -122,6 +121,7 @@ def prune_model(model):
             prune_conv(m, 0.2)
     return model
 
+
 def exp():
     result = []
     net = LeNet()
@@ -163,6 +163,7 @@ def exp():
     res = train_ch5(net, train_iter, test_iter, batch_size, optimizer, device, num_epochs)
     print(res)
     print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^pruned_model_from_scratch_ends^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+    return res
 
 if __name__ == '__main__':
     exp()
