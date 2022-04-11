@@ -1,4 +1,5 @@
 import sys, os
+from psutil import swap_memory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 import torch
 import torch.nn as nn
@@ -60,6 +61,22 @@ for k, v in module_to_idxs2.items():
 print('-'*30)
 
 
+# 交换idxs
+for i, ((k1, v1), (k2, v2)) in enumerate(zip(*[module_to_idxs1.items(), module_to_idxs2.items()])):
+    print(i)
+    print(k1, v1)
+    print(k2, v2)
+    if i == 5:
+        tmp = module_to_idxs1[k1]
+        module_to_idxs1[k1] = module_to_idxs2[k2]
+        module_to_idxs2[k2] = tmp
+
+print('<'*50)
+
+for i, ((k1, v1), (k2, v2)) in enumerate(zip(*[module_to_idxs1.items(), module_to_idxs2.items()])):
+    print(i)
+    print(k1, v1)
+    print(k2, v2)
 # print(model)
 # for plan in pruning_plans:
 #         plan.exec()
