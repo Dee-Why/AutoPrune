@@ -43,12 +43,26 @@ class DeepFCN(nn.Module):
 model = DeepFCN(128, 10)
 print(model)
 
-planner = tp.planner.GlobalRandomPlanner()
-pruning_plans = planner(model, amount=0.2, target_type=nn.Linear, static_layers=[model.fc5], example_inputs=torch.randn(1,128))
+print('-'*30)
 
-print(model)
-for plan in pruning_plans:
-        plan.exec()
-print('<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< before')
-print('after >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
-print(model)
+module_to_idxs1 = tp.planner.get_ordered_module_to_idxs(model, amount=0.2, target_type=nn.Linear, static_layers=[model.fc5], example_inputs=torch.randn(1,128))
+
+for k, v in module_to_idxs1.items():
+    print(k, v)
+
+print('-'*30)
+
+module_to_idxs2 = tp.planner.get_ordered_module_to_idxs(model, amount=0.2, target_type=nn.Linear, static_layers=[model.fc5], example_inputs=torch.randn(1,128))
+
+for k, v in module_to_idxs2.items():
+    print(k, v)
+
+print('-'*30)
+
+
+# print(model)
+# for plan in pruning_plans:
+#         plan.exec()
+# print('<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< before')
+# print('after >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+# print(model)

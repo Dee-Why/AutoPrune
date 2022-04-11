@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import typing
+import collections
 from abc import ABC, abstractclassmethod
 from . import prune
 from .dependency import *
@@ -55,3 +56,31 @@ class GlobalRandomPlanner(BaseGloalPlanner):
                 pruning_plans.append(DG.get_pruning_plan(m, prune.prune_linear, idxs=module_to_idxs[m]))
         model.apply(get_pruning_plans)
         return pruning_plans
+
+
+# TODO: 要搞出来一个evolve过程，输入一个模型，输出一个训练过的模型池
+# 理论基础是LTH，也就是说用同样的初始化，利用遗传算法找winning ticket
+# 首先，我们要能记录一次剪枝的具体细节，并移植到另一个网络去
+# 我认为最简单的方法就是使用orderded dict。这样我们的字典不光有键值对儿，而且还可以借助顺序相同来进行idxs的迁移
+
+def get_ordered_module_to_idxs(model, amount, target_type, static_layers, example_inputs):
+    module_to_idxs = collections.OrderedDict()
+    def init_strategy(m):
+        strategy = prune.strategy.RandomStrategy()
+        if isinstance(m, target_type) and m not in static_layers:
+            module_to_idxs[m] = strategy(m.weight, amount=amount)
+    model.apply(init_strategy)
+    return module_to_idxs
+
+
+def crossover():
+    # 两个训练过的剪枝模型的idxs进行局部交换，然后从原始模型里prune出来，然后train from scratch
+    return
+
+def inherit():
+    # 只需要维护模型池，也就是存档的 文件名称 和 他们performance指标
+    return
+
+def mutation():
+    # 对于一个连续的段进行
+    return
