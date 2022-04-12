@@ -62,6 +62,7 @@ class GlobalRandomPlanner(BaseGloalPlanner):
 # 理论基础是LTH，也就是说用同样的初始化，利用遗传算法找winning ticket
 # 首先，我们要能记录一次剪枝的具体细节，并移植到另一个网络去
 # 我认为最简单的方法就是使用orderded dict。这样我们的字典不光有键值对儿，而且还可以借助顺序相同来进行idxs的迁移
+# 对于全连接网络，交叉互换的最小单位是层
 
 def get_ordered_module_to_idxs(model, amount, target_type, static_layers, example_inputs):
     module_to_idxs = collections.OrderedDict()
@@ -73,14 +74,20 @@ def get_ordered_module_to_idxs(model, amount, target_type, static_layers, exampl
     return module_to_idxs
 
 
-def crossover():
+def crossover(module_to_idxs1, module_to_idxs2, indicate_vector):
     # 两个训练过的剪枝模型的idxs进行局部交换，然后从原始模型里prune出来，然后train from scratch
-    return
+    # 交换idxs
+    for i, ((k1, v1), (k2, v2)) in enumerate(zip(*[module_to_idxs1.items(), module_to_idxs2.items()])):
+        if indicate_vector[i] == 1:
+            tmp = module_to_idxs1[k1]
+            module_to_idxs1[k1] = module_to_idxs2[k2]
+            module_to_idxs2[k2] = tmp
+    return module_to_idxs1, module_to_idxs2
 
 def inherit():
     # 只需要维护模型池，也就是存档的 文件名称 和 他们performance指标
     return
 
-def mutation():
-    # 对于一个连续的段进行
+def mutation(module_to_idx, indicate_vector):
+    # 利用crossover，让原有模型和随机模型进行交叉互换
     return
