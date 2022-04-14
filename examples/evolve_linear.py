@@ -225,7 +225,7 @@ if __name__ == '__main__':
 
     # 预训练模型
     import torch_pruning.experiment as experiment
-    experiment.fast_train(base_model, 2)
+    experiment.fast_train(base_model, 20)
     experiment_history = [[base_model.performance]]
     # 创建模型池 并产生第一代
     model_pool = ModulePool(base_model, population, example_inputs)
@@ -233,18 +233,19 @@ if __name__ == '__main__':
     # 训练第一代
     for model in model_pool.pool:
         # if not hasattr(model, 'performance'):
-        experiment.fast_train(model, 2)
+        experiment.fast_train(model, 20)
     # 保存第一代成果
     experiment_history.append([model.performance for model in model_pool.pool])
-    # 产生第二代 继承率0.3 交叉互换率0.55 变异率0.15
-    model_pool.evolve(0.3, 0.55)
-    # 训练第二代
-    for model in model_pool.pool:
-        # if not hasattr(model, 'performance'):
-        experiment.fast_train(model, 2)
+    for generation in range(20):
+        # 产生第二代 继承率0.3 交叉互换率0.55 变异率0.15
+        model_pool.evolve(0.3, 0.55)
+        # 训练第二代
+        for model in model_pool.pool:
+            # if not hasattr(model, 'performance'):
+            experiment.fast_train(model, 20)
+        # 所有子代成果
+        experiment_history.append([model.performance for model in model_pool.pool])
 
-    experiment_history.append([model.performance for model in model_pool.pool])
-
-    model_pool.elimination()
-
-    experiment_history.append([model.performance for model in model_pool.pool])
+        model_pool.elimination()
+        # 筛选后留下的部分
+        experiment_history.append([model.performance for model in model_pool.pool])
