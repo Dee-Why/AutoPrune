@@ -44,7 +44,6 @@ class DeepFCN(nn.Module):
 if __name__ == '__main__':
     base_model = DeepFCN(225, 10)
     population = 5
-    target_type = nn.Linear  # 目前无用
     static_layers = [base_model.fc5]
     example_inputs = torch.randn(1, 225)
     # 算法需要的专属标签【do_not_prune】
@@ -56,7 +55,7 @@ if __name__ == '__main__':
     experiment.fast_train(base_model, 5)
     experiment_history = [[base_model.performance]]
     # 创建模型池 并产生第一代
-    model_pool = tp.ModulePool(base_model, population, example_inputs)
+    model_pool = tp.ModelPool(base_model, population, example_inputs)
     model_pool.spawn_first_generation()
     # 训练第一代
     for model in model_pool.pool:
@@ -66,7 +65,7 @@ if __name__ == '__main__':
     experiment_history.append([model.performance for model in model_pool.pool])
     for generation in range(5):
         # 产生第二代 继承率0.3 交叉互换率0.55 变异率0.15
-        model_pool.evolve(0.3, 0.55)
+        model_pool.evolve(0.3, 0.55, 0.15)
         # 训练第二代
         for model in model_pool.pool:
             # if not hasattr(model, 'performance'):

@@ -104,9 +104,9 @@ def get_pruning_plans(model, example_inputs):
     return pruning_plans
 
 
-class ModulePool(ABC):
+class ModelPool(ABC):
     def __init__(self, base_model, population, example_inputs, strategy=None):
-        super(ModulePool, self).__init__()
+        super(ModelPool, self).__init__()
         self.base_model = base_model
         self.pool = []
         self.population = population
@@ -209,7 +209,8 @@ class ModulePool(ABC):
         self.pool.append(child)
         return
 
-    def evolve(self, s1, s2):
+    def evolve(self, s1, s2, s3):
+        assert s1 >= 0 and s2 >= 0 and s3 >= 0 and s1+s2+s3 == 1
         for i in range(self.population):
             if i == 0:
                 print(i, 'inherit')
