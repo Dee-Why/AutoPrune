@@ -8,7 +8,6 @@ from torch_pruning import ModelPool
 import torch_pruning.experiment as experiment
 import random
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class LeNet(nn.Module):
     def __init__(self):
