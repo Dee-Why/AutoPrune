@@ -89,11 +89,13 @@ if __name__ == '__main__':
     # 训练部分
     for model in model_pool.pool:
         experiment.fast_train_le(model, 1)
+        experiment_history.append([model.performance for model in model_pool.pool])
     # 进化部分
     for generation in range(5):
         model_pool.evolve(0.3, 0.55, 0.15)
         for model in model_pool.pool:
             experiment.fast_train_le(model, 1)
         model_pool.elimination()
+        experiment_history.append([model.performance for model in model_pool.pool])
 
     print(experiment_history)

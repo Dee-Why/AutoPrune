@@ -125,7 +125,7 @@ class ModelPool(ABC):
     def spawn_first_generation(self):
         for i in range(self.population):
             child = deepcopy(self.base_model)
-            child.module_to_idxs = get_module_to_idxs(child, 0.2, (nn.Linear, nn.Conv2d))
+            child.module_to_idxs = get_module_to_idxs(child, random.uniform(0,1), (nn.Linear, nn.Conv2d))
             pruning_plans = get_pruning_plans(child, self.example_inputs)
             for plan in pruning_plans:
                 plan.exec()
@@ -202,7 +202,7 @@ class ModelPool(ABC):
         e = random.randint(s + 1, len(vec))
         indicate_vector = [1 if s <= i < e else 0 for i in range(len(vec))]
         child = deepcopy(self.base_model)
-        child.module_to_idxs = get_module_to_idxs(child, 0.2, (nn.Linear, nn.Conv2d))
+        child.module_to_idxs = get_module_to_idxs(child, random.uniform(0,1), (nn.Linear, nn.Conv2d))
         for i, ((k1, v1), (k2, v2)) in enumerate(zip(*[child.module_to_idxs.items(), vec.items()])):
             if indicate_vector[i] == 0:
                 child.module_to_idxs[k1] = vec[k2]
