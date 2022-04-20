@@ -4,13 +4,14 @@ import time
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-def load_flatten_fashion_mnist(batch_size, resize=None, root='~/Datasets'):
+def load_data_fashion_mnist(batch_size, resize=None, root='~/Datasets', flatten=False):
     """Download the fashion mnist dataset and then load into memory."""
     trans = []
     if resize:
         trans.append(torchvision.transforms.Resize(size=resize))
     trans.append(torchvision.transforms.ToTensor())
-    trans.append(torchvision.transforms.Lambda(lambda x: torch.flatten(x)))
+    if flatten:
+        trans.append(torchvision.transforms.Lambda(lambda x: torch.flatten(x)))
     transform = torchvision.transforms.Compose(trans)
 
     mnist_train = torchvision.datasets.FashionMNIST(root=root, train=True, download=True, transform=transform)
@@ -74,10 +75,28 @@ def train_ch5(net, train_iter, test_iter, batch_size, optimizer, device, num_epo
 
 
 
-def fast_train(net, num_epochs):
+def fast_train_dense(net, num_epochs):
     batch_size = 128
-    train_iter, test_iter = load_flatten_fashion_mnist(batch_size,
-                                                       resize=15)  # 如出现“out of memory”的报错信息，可减小batch_size或resize
+    train_iter, test_iter = load_data_fashion_mnist(batch_size,
+                                                       resize=15, flatten=True)  # 如出现“out of memory”的报错信息，可减小batch_size或resize
+    lr = 0.001
+    optimizer = torch.optim.Adam(net.parameters(), lr=lr)
+    res = train_ch5(net, train_iter, test_iter, batch_size, optimizer, device, num_epochs)
+    net.performance = res['incumbent_test_accuracy']
+
+
+def fast_train_alex(net, num_epochs):
+    batch_size = 128
+    train_iter, test_iter = load_data_fashion_mnist(batch_size, resize=224, flatten=False)
+    lr = 0.001
+    optimizer = torch.optim.Adam(net.parameters(), lr=lr)
+    res = train_ch5(net, train_iter, test_iter, batch_size, optimizer, device, num_epochs)
+    net.performance = res['incumbent_test_accuracy']
+
+
+def fast_train_le(net, num_epochs):
+    batch_size = 128
+    train_iter, test_iter = load_data_fashion_mnist(batch_size, resize=28, flatten=False)
     lr = 0.001
     optimizer = torch.optim.Adam(net.parameters(), lr=lr)
     res = train_ch5(net, train_iter, test_iter, batch_size, optimizer, device, num_epochs)
