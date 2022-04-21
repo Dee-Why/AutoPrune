@@ -4,6 +4,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 import torch
 import torch.nn as nn
 import torch_pruning as tp
+from torch_pruning import experiment
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -52,7 +53,7 @@ if __name__ == '__main__':
 
     # 预训练模型
     import torch_pruning.experiment as experiment
-    experiment.fast_train(base_model, 5)
+    experiment.fast_train_dense(base_model, 5)
     experiment_history = [[base_model.performance]]
     # 创建模型池 并产生第一代
     model_pool = tp.ModelPool(base_model, population, example_inputs)
@@ -60,7 +61,7 @@ if __name__ == '__main__':
     # 训练第一代
     for model in model_pool.pool:
         # if not hasattr(model, 'performance'):
-        experiment.fast_train(model, 2)
+        experiment.fast_train_dense(model, 2)
     # 保存第一代成果
     experiment_history.append([model.performance for model in model_pool.pool])
     for generation in range(5):
@@ -69,7 +70,7 @@ if __name__ == '__main__':
         # 训练第二代
         for model in model_pool.pool:
             # if not hasattr(model, 'performance'):
-            experiment.fast_train(model, 2)
+            experiment.fast_train_dense(model, 2)
         # 所有子代成果
         experiment_history.append([model.performance for model in model_pool.pool])
 

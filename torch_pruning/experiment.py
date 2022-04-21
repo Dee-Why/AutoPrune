@@ -1,6 +1,7 @@
 import torch
 import torchvision
 import time
+from tensorboardX import SummaryWriter
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -73,6 +74,14 @@ def train_ch5(net, train_iter, test_iter, batch_size, optimizer, device, num_epo
     return {'incumbent_epoch': incumbent_epoch, 'incumbent_test_accuracy': incumbent_test_accuracy}
 
 
+def visualize_incumbent(data):
+    writer = SummaryWriter(write_to_disk=True)
+    n_iter = 0
+    for arr in data:
+        n_iter += 1
+        arr.sort()
+        writer.add_scalar('data/best', arr[-1], n_iter)
+    writer.close()
 
 
 def fast_train_dense(net, num_epochs):
