@@ -10,6 +10,8 @@ import torch_pruning.experiment as experiment
 from openbox import Advisor, Observation, sp
 import matplotlib.pyplot as plt
 
+torch.set_num_threads(1)
+
 INIT_RUN = 1
 FINETUNE = 1
 GENERATION = 2
@@ -97,7 +99,7 @@ def exp(config):
     population = POPULATION
     # static_layers = [base_model.fc[4]]
     static_layers = [base_model.fc[6]]
-    example_inputs = torch.randn(1, 1, 28, 28)
+    example_inputs = torch.randn(1, 1, 224, 224)
     for layer in static_layers:
         layer.do_not_prune = True
     # 创建模型池
