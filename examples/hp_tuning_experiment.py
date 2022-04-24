@@ -1,0 +1,98 @@
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+import torch
+import torch.nn as nn
+import torch_pruning as tp
+from torch_pruning import ModelPool
+import torch_pruning.experiment as experiment
+from openbox import Advisor, Observation, sp
+import matplotlib.pyplot as plt
+
+# Define Search Space
+space = sp.Space()
+s1 = sp.Real("s1", 0, 1, default_value=0.3)
+s2 = sp.Real("s2", 0, 1, default_value=0.55)
+s3 = sp.Real('s3', 0, 1, default_value=0.15)
+space.add_variables([s1, s2, s3])
+
+class LeNet(nn.Module):
+    def __init__(self):
+        super(LeNet, self).__init__()
+        self.conv = nn.Sequential(
+            nn.Conv2d(1,6,5),
+            nn.Sigmoid(),
+            nn.MaxPool2d(2,2),
+            nn.Conv2d(6,16,5),
+            nn.Sigmoid(),
+            nn.MaxPool2d(2,2)
+        )
+        self.fc = nn.Sequential(
+            nn.Linear(16*4*4, 120),
+            nn.Sigmoid(),
+            nn.Linear(120, 84),
+            nn.Sigmoid(),
+            nn.Linear(84, 10)
+        )
+        
+    def forward(self, img):
+        feature = self.conv(img)
+        output = self.fc(feature.view(img.shape[0], -1))
+        return output
+
+# define objective function
+def exp(config):
+    s1, s2, s3 = config['s1'], config['s2'], config['s3']
+    sum = s1 + s2 + s3
+    s1, s2, s3 = s1/sum, s2/sum, s3/sum
+    base_model = LeNet()
+    experiment.fast_train_le(base_model, 1)
+    experiment_history = [[base_model.performance]]
+    # 设置遗传算法超参数
+    population = 3
+    static_layers = [base_model.fc[4]]
+    example_inputs = torch.randn(1, 1, 28, 28)
+    for layer in static_layers:
+        layer.do_not_prune = True
+    # 创建模型池
+    model_pool = ModelPool(base_model, population, example_inputs)
+    model_pool.spawn_first_generation()
+    # 训练部分
+    for model in model_pool.pool:
+        experiment.fast_train_le(model, 1)
+        experiment_history.append([model.performance for model in model_pool.pool])
+    # 进化部分
+    for generation in range(2):
+        model_pool.evolve(s1,s2,s3)
+        for model in model_pool.pool:
+            experiment.fast_train_le(model, 1)
+        model_pool.elimination()
+        experiment_history.append([model.performance for model in model_pool.pool])
+
+    print(experiment_history)
+    last_run= experiment_history[-1]
+    last_run.sort()
+    res = last_run[-1]
+    print('incumbent: ', res)
+    return {'objs': (res,)}  # 返回最后一代里的最优值
+
+# Run
+if __name__ == '__main__':
+    advisor = Advisor(
+        space,
+        surrogate_type='auto',
+        task_id='evolve_hp_turn'
+    )
+    MAX_RUNS = 1
+    for i in range(MAX_RUNS):
+        config = advisor.get_suggestion()
+        ret = exp(config)
+        observation = Observation(config=config, objs=ret['objs'])
+        advisor.update_observation(observation)
+        print('===== ITER %d/%d: %s.' % (i+1, MAX_RUNS, observation))
+
+    history = advisor.get_history()
+    print(history)
+
+    history.plot_convergence()
+    plt.savefig('./exp_fig')
