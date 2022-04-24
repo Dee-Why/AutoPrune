@@ -125,6 +125,8 @@ class ModelPool(ABC):
     def spawn_first_generation(self):
         for i in range(self.population):
             child = deepcopy(self.base_model)
+            if hasattr(child, 'performance'):
+                delattr(child, "performance")
             child.module_to_idxs = get_module_to_idxs(child, random.uniform(0,1), (nn.Linear, nn.Conv2d))
             pruning_plans = get_pruning_plans(child, self.example_inputs)
             for plan in pruning_plans:
@@ -184,6 +186,8 @@ class ModelPool(ABC):
 
         for vec in [vec1, vec2]:
             child = deepcopy(self.base_model)
+            if hasattr(child, 'performance'):
+                delattr(child, "performance")
             child.module_to_idxs = get_module_to_idxs(child, 0, (nn.Linear, nn.Conv2d))
             for i, ((k1, v1), (k2, v2)) in enumerate(zip(*[child.module_to_idxs.items(), vec.items()])):
                 child.module_to_idxs[k1] = vec[k2]  # 对应位置赋值
@@ -202,6 +206,8 @@ class ModelPool(ABC):
         e = random.randint(s + 1, len(vec))
         indicate_vector = [1 if s <= i < e else 0 for i in range(len(vec))]
         child = deepcopy(self.base_model)
+        if hasattr(child, 'performance'):
+                delattr(child, "performance")
         child.module_to_idxs = get_module_to_idxs(child, random.uniform(0,1), (nn.Linear, nn.Conv2d))
         for i, ((k1, v1), (k2, v2)) in enumerate(zip(*[child.module_to_idxs.items(), vec.items()])):
             if indicate_vector[i] == 0:
@@ -214,13 +220,13 @@ class ModelPool(ABC):
         return
 
     def evolve(self, s1, s2, s3):
-        assert s1 >= 0 and s2 >= 0 and s3 >= 0 and s1+s2+s3 == 1
+        assert s1 >= 0 and s2 >= 0 and s3 >= 0
         for i in range(self.population):
             if i == 0:
                 print(i, 'inherit')
                 self.inherit()
                 continue
-            dice = random.random()
+            dice = random.uniform(0, s1+s2+s3)
             if dice < s1:
                 print(i, 'selection')
                 self.selection()
