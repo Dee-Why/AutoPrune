@@ -90,8 +90,8 @@ def exp(config):
     s1, s2, s3 = config['s1'], config['s2'], config['s3']
     sum = s1 + s2 + s3
     s1, s2, s3 = s1/sum, s2/sum, s3/sum
-    base_model = LeNet()
-    experiment.fast_train_le(base_model, INIT_RUN)
+    base_model = AlexNet()
+    experiment.fast_train_alex(base_model, INIT_RUN)
     experiment_history = [[base_model.performance]]
     # 设置遗传算法超参数
     population = POPULATION
@@ -105,7 +105,7 @@ def exp(config):
     model_pool.spawn_first_generation()
     for model in model_pool.pool:
         if not hasattr(model, 'performance'):
-            experiment.fast_train_le(model, FINETUNE)
+            experiment.fast_train_alex(model, FINETUNE)
     experiment_history.append([model.performance for model in model_pool.pool])
     # 进化部分
     for generation in range(GENERATION):
@@ -113,7 +113,7 @@ def exp(config):
         model_pool.evolve(s1,s2,s3)
         for model in model_pool.pool:
             if not hasattr(model, 'performance'):
-                experiment.fast_train_le(model, 1)
+                experiment.fast_train_alex(model, 1)
         model_pool.elimination()
         experiment_history.append([model.performance for model in model_pool.pool])
 
