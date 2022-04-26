@@ -9,14 +9,28 @@ from torch_pruning import ModelPool
 import torch_pruning.experiment as experiment
 from openbox import Advisor, Observation, sp
 import matplotlib.pyplot as plt
+import pickle
+import argparse
 
 torch.set_num_threads(1)
 
-INIT_RUN = 1
-FINETUNE = 1
-GENERATION = 2
-POPULATION = 3
-MAX_RUNS = 3
+parser = argparse.ArgumentParser()
+
+parser.add_argument('--i', type=int, help='base_model init epoch')
+parser.add_argument('--f', type=int, help='finetune epoch')
+parser.add_argument('--g', type=int, help='evolve generation')
+parser.add_argument('--p', type=int, help='evolve population')
+parser.add_argument('--r', type=int, help='MAX_RUNS for openbox')
+parser.add_argument('--s', type=str, choices=['random', 'L1'])
+# Parse args
+args = parser.parse_args()
+
+INIT_RUN = args.i
+FINETUNE = args.f
+GENERATION = args.g
+POPULATION = args.p
+MAX_RUNS = args.r
+STRATEGY = args.s
 
 # Define Search Space
 space = sp.Space()
@@ -25,29 +39,6 @@ s2 = sp.Real("s2", 0, 1, default_value=0.55)
 s3 = sp.Real('s3', 0, 1, default_value=0.15)
 space.add_variables([s1, s2, s3])
 
-class LeNet(nn.Module):
-    def __init__(self):
-        super(LeNet, self).__init__()
-        self.conv = nn.Sequential(
-            nn.Conv2d(1,6,5),
-            nn.Sigmoid(),
-            nn.MaxPool2d(2,2),
-            nn.Conv2d(6,16,5),
-            nn.Sigmoid(),
-            nn.MaxPool2d(2,2)
-        )
-        self.fc = nn.Sequential(
-            nn.Linear(16*4*4, 120),
-            nn.Sigmoid(),
-            nn.Linear(120, 84),
-            nn.Sigmoid(),
-            nn.Linear(84, 10)
-        )
-        
-    def forward(self, img):
-        feature = self.conv(img)
-        output = self.fc(feature.view(img.shape[0], -1))
-        return output
 
 class AlexNet(nn.Module):
     def __init__(self):
@@ -87,6 +78,7 @@ class AlexNet(nn.Module):
         output = self.fc(feature.view(img.shape[0], -1))
         return output
 
+
 # define objective function
 def exp(config):
     s1, s2, s3 = config['s1'], config['s2'], config['s3']
@@ -104,7 +96,7 @@ def exp(config):
         layer.do_not_prune = True
     # 创建模型池
     model_pool = ModelPool(base_model, population, example_inputs)
-    model_pool.spawn_first_generation()
+    model_pool.spawn_first_generation(_strategy=STRATEGY)
     for model in model_pool.pool:
         if not hasattr(model, 'performance'):
             experiment.fast_train_alex(model, FINETUNE)
@@ -112,10 +104,10 @@ def exp(config):
     # 进化部分
     for generation in range(GENERATION):
         print('[generation', generation,']')
-        model_pool.evolve(s1,s2,s3)
+        model_pool.evolve(s1,s2,s3,_strategy=STRATEGY)
         for model in model_pool.pool:
             if not hasattr(model, 'performance'):
-                experiment.fast_train_alex(model, 1)
+                experiment.fast_train_alex(model, FINETUNE)
         model_pool.elimination()
         experiment_history.append([model.performance for model in model_pool.pool])
 
@@ -124,7 +116,8 @@ def exp(config):
     last_run.sort()
     res = last_run[-1]
     print('incumbent: ', res)
-    return {'objs': (res,)}  # 返回最后一代里的最优值
+    print('loss', 1-res)
+    return {'objs': (1-res,)}  # 返回最后一代里的最优值对应的loss，因为openbox默认为最小化任务
 
 # Run
 if __name__ == '__main__':
@@ -139,9 +132,16 @@ if __name__ == '__main__':
         observation = Observation(config=config, objs=ret['objs'])
         advisor.update_observation(observation)
         print('===== ITER %d/%d: %s.' % (i+1, MAX_RUNS, observation))
+        print('^'*60)
 
     history = advisor.get_history()
     print(history)
 
     history.plot_convergence()
-    plt.savefig('./hp_i'+str(INIT_RUN)+'f'+str(FINETUNE)+'p'+str(POPULATION)+'g'+str(GENERATION)+'r'+str(MAX_RUNS)+'_'+time.strftime("%Y%m%d-%H:%M:%S", time.localtime()))
+    timestring = time.strftime("%Y%m%d-%H:%M:%S", time.localtime())
+    expstring = './hp_'+STRATEGY+'_i'+str(INIT_RUN)+'f'+str(FINETUNE)+'p'+str(POPULATION)+'g'+str(GENERATION)+'r'+str(MAX_RUNS)+'_'+timestring
+    plt.savefig(expstring)
+    with open(expstring+'_perfs.pkl','wb') as p:
+        pickle.dump(history.perfs, p)
+    with open(expstring+'_confs.pkl', 'wb') as p:
+        pickle.dump(history.configurations, p)

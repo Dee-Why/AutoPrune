@@ -77,15 +77,19 @@ def get_ordered_module_to_idxs(model, amount, target_type, static_layers, exampl
     return module_to_idxs
 
 
-def get_module_to_idxs(model, amount, target_type):
+def get_module_to_idxs(model, amount, target_type, _strategy='random'):
     module_to_idxs = collections.OrderedDict()
 
     def init_strategy(m):
-        strategy = prune.strategy.RandomStrategy()
+        if _strategy == 'random':
+            strategy = prune.strategy.RandomStrategy()
+        elif _strategy == 'L1':
+            strategy = prune.strategy.L1Strategy()
         if hasattr(m, 'do_not_prune'):
             return
         elif isinstance(m, target_type):
             module_to_idxs[m] = strategy(m.weight, amount=amount)
+
 
     model.apply(init_strategy)
     return module_to_idxs
@@ -122,12 +126,12 @@ class ModelPool(ABC):
         for para in base_model.parameters():
             self.num_parameter_base += para.size().numel()
 
-    def spawn_first_generation(self):
+    def spawn_first_generation(self, _strategy='random'):
         for i in range(self.population):
             child = deepcopy(self.base_model)
             if hasattr(child, 'performance'):
                 delattr(child, "performance")
-            child.module_to_idxs = get_module_to_idxs(child, random.uniform(0,1), (nn.Linear, nn.Conv2d))
+            child.module_to_idxs = get_module_to_idxs(child, random.uniform(0,1), (nn.Linear, nn.Conv2d), _strategy=_strategy)
             pruning_plans = get_pruning_plans(child, self.example_inputs)
             for plan in pruning_plans:
                 plan.exec()
@@ -197,7 +201,7 @@ class ModelPool(ABC):
             self.pool.append(child)
         return
 
-    def mutation(self):
+    def mutation(self, _strategy='random'):
         index = [i for i in range(self.population)]
         weights = [self.fitness[i] for i in range(self.population)]
         choice = random.choices(index, weights=weights, k=1)[0]
@@ -208,7 +212,7 @@ class ModelPool(ABC):
         child = deepcopy(self.base_model)
         if hasattr(child, 'performance'):
                 delattr(child, "performance")
-        child.module_to_idxs = get_module_to_idxs(child, random.uniform(0,1), (nn.Linear, nn.Conv2d))
+        child.module_to_idxs = get_module_to_idxs(child, random.uniform(0,1), (nn.Linear, nn.Conv2d), _strategy=_strategy)
         for i, ((k1, v1), (k2, v2)) in enumerate(zip(*[child.module_to_idxs.items(), vec.items()])):
             if indicate_vector[i] == 0:
                 child.module_to_idxs[k1] = vec[k2]
@@ -219,7 +223,7 @@ class ModelPool(ABC):
         self.pool.append(child)
         return
 
-    def evolve(self, s1, s2, s3):
+    def evolve(self, s1, s2, s3, _strategy='random'):
         assert s1 >= 0 and s2 >= 0 and s3 >= 0
         for i in range(self.population):
             if i == 0:
@@ -235,7 +239,7 @@ class ModelPool(ABC):
                 self.crossover()
             else:
                 print(i, 'mutation')
-                self.mutation()
+                self.mutation(_strategy=_strategy)
 
     def elimination(self):
         for i in range(self.population-1, -1, -1):
