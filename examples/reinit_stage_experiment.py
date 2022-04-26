@@ -8,14 +8,13 @@ import torch.nn as nn
 import torch_pruning as tp
 from torch_pruning import ModelPool
 import torch_pruning.experiment as experiment
-from openbox import Advisor, Observation, sp
-import matplotlib.pyplot as plt
 import pickle
 import argparse
 
 torch.set_num_threads(1)
 
 parser = argparse.ArgumentParser()
+parser.add_argument('--type', type=str, choices=['alex', 'dense'])
 parser.add_argument('--i', type=int, help='base_model init epoch')
 parser.add_argument('--f', type=int, help='finetune epoch')
 parser.add_argument('--g', type=int, help='evolve generation')
@@ -23,6 +22,7 @@ parser.add_argument('--p', type=int, help='evolve population')
 parser.add_argument('--m', type=int, help='MAX_STAGE: compression iteration num')
 parser.add_argument('--s', type=str, choices=['random', 'L1'])
 args = parser.parse_args()
+MODEL_TYPE = args.type
 INIT_RUN = args.i
 FINETUNE = args.f
 GENERATION = args.g
@@ -77,7 +77,7 @@ def compress_alex(base_model, s1, s2, s3):
     perf_list = [model.performance for model in model_pool.pool]
     index = perf_list.index(max(perf_list))
 
-    return {'objs': (1-res,), 'history': experiment_history, 'compressed_model': model_pool.pool[index]}  # 返回最后一代里的最优值对应的loss，因为openbox默认为最小化任务
+    return {'objs': (1-res,), 'history': experiment_history, 'compressed_model': model_pool.pool[index], 'model_pool': model_pool}  # 返回最后一代里的最优值对应的loss，因为openbox默认为最小化任务
 
 def compress_dense(base_model, s1, s2, s3):
     """Example experiment.
@@ -125,29 +125,39 @@ def compress_dense(base_model, s1, s2, s3):
     perf_list = [model.performance for model in model_pool.pool]
     index = perf_list.index(max(perf_list))
 
-    return {'objs': (1-res,), 'history': experiment_history, 'compressed_model': model_pool.pool[index]}  # 返回最后一代里的最优值对应的loss，因为openbox默认为最小化任务
+    return {'objs': (1-res,), 'history': experiment_history, 'compressed_model': model_pool.pool[index], 'model_pool': model_pool}  # 返回最后一代里的最优值对应的loss，因为openbox默认为最小化任务
 
 # Run
 if __name__ == '__main__':
-    # base_model = experiment.AlexNetMnist()  # Alex Version
-    # base_model.fc[6].do_not_prune = True  # AlexNet static Layer
-    base_model = experiment.DeepFCN(225,10) # Dense Version
-    base_model.fc5.do_not_prune = True  # Dense static Layer
+    if MODEL_TYPE == 'alex':
+        base_model = experiment.AlexNetMnist()  # Alex Version
+        base_model.fc[6].do_not_prune = True  # AlexNet static Layer
+    elif MODEL_TYPE == 'dense':
+        base_model = experiment.DeepFCN(225,10) # Dense Version
+        base_model.fc5.do_not_prune = True  # Dense static Layer
 
     # 阶段性遗传算法迭代
     experiment_history = []
+    parameter_num_history = []
     s1, s2, s3 = 0.3, 0.55, 0.15
     for stage in range(MAX_STAGE):
-        # res = compress_alex(base_model, s1, s2, s3)
-        res = compress_dense(base_model, s1, s2, s3)
+        if MODEL_TYPE == 'alex':
+            res = compress_alex(base_model, s1, s2, s3)
+        elif MODEL_TYPE == 'dense':
+            res = compress_dense(base_model, s1, s2, s3)
         base_model = res['compressed_model']
         experiment_history.extend(res['history'])
+        parameter_num_history.append(res['model_pool'].calculate_parameter_num())
+        
 
     timestring = time.strftime("%Y%m%d-%H:%M:%S", time.localtime())
-    expstring = './reinit_'+STRATEGY+'_i'+str(INIT_RUN)+'f'+str(FINETUNE)+'p'+str(POPULATION)+'g'+str(GENERATION)+'m'+str(MAX_STAGE)+'_'+timestring
+    expstring = './reinit_'+MODEL_TYPE+'_'+STRATEGY+'_i'+str(INIT_RUN)+'f'+str(FINETUNE)+'p'+str(POPULATION)+'g'+str(GENERATION)+'m'+str(MAX_STAGE)+'_'+timestring
     
     # TODO: save the compressed model
     print(base_model)
+    torch.save(base_model, expstring+'.model')
     
     with open(expstring+'_history.pkl','wb') as p:
         pickle.dump(experiment_history, p)
+    with open(expstring+'_parameter_num.pkl','wb') as p:
+        pickle.dump(parameter_num_history, p)

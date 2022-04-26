@@ -126,6 +126,16 @@ class ModelPool(ABC):
         for para in base_model.parameters():
             self.num_parameter_base += para.size().numel()
 
+    def calculate_parameter_num(self):
+        res = []
+        for model in self.pool:
+            num = 0
+            for para in model.parameters():
+                num += para.size().numel()
+            res.append(num)
+        return res
+
+
     def spawn_first_generation(self, _strategy='random'):
         for i in range(self.population):
             child = deepcopy(self.base_model)
