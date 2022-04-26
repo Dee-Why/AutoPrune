@@ -1,5 +1,6 @@
 import torch
 import torchvision
+import torch.nn as nn
 import time
 from tensorboardX import SummaryWriter
 
@@ -85,6 +86,39 @@ def visualize_incumbent(data):
     writer.close()
 
 
+class DeepFCN(nn.Module):
+    def __init__(self, input_size, num_classes):
+        super(DeepFCN, self).__init__()
+        self.fc1 = nn.Linear(input_size, 256)
+        self.add_module('first_relu', nn.ReLU())
+        self.fc2 = nn.Sequential(
+            nn.Linear(256, 64),
+            nn.ReLU()
+        )
+        self.fc3 = nn.ModuleList(
+            [nn.Sequential(
+                nn.Linear(64, 64),
+                nn.ReLU()) for i in range(3)
+            ]
+        )
+        self.fc4 = nn.ModuleDict({
+            'fc4-1': nn.Linear(64, 32),
+            'relu': nn.ReLU()
+        })
+        self.fc5 = nn.Linear(32, num_classes)
+
+    def forward(self, x):
+        x = self.fc1(x)
+        x = self.first_relu(x)
+        x = self.fc2(x)
+        for i, l in enumerate(self.fc3):
+            x = l(x)
+        x = self.fc4['fc4-1'](x)
+        x = self.fc4['relu'](x)
+        y_hat = self.fc5(x)
+        return y_hat
+
+
 def fast_train_dense(net, num_epochs):
     batch_size = 128
     train_iter, test_iter = load_data_fashion_mnist(batch_size,
@@ -94,6 +128,44 @@ def fast_train_dense(net, num_epochs):
     res = train_ch5(net, train_iter, test_iter, batch_size, optimizer, device, num_epochs)
     net.performance = res['incumbent_test_accuracy']
 
+
+class AlexNetMnist(nn.Module):
+    def __init__(self):
+        super(AlexNetMnist, self).__init__()
+        self.conv = nn.Sequential(
+            nn.Conv2d(1, 96, 11, 4), # in_channels, out_channels, kernel_size, stride, padding
+            nn.ReLU(),
+            nn.MaxPool2d(3, 2), # kernel_size, stride
+            # 减小卷积窗口，使用填充为2来使得输入与输出的高和宽一致，且增大输出通道数
+            nn.Conv2d(96, 256, 5, 1, 2),
+            nn.ReLU(),
+            nn.MaxPool2d(3, 2),
+            # 连续3个卷积层，且使用更小的卷积窗口。除了最后的卷积层外，进一步增大了输出通道数。
+            # 前两个卷积层后不使用池化层来减小输入的高和宽
+            nn.Conv2d(256, 384, 3, 1, 1),
+            nn.ReLU(),
+            nn.Conv2d(384, 384, 3, 1, 1),
+            nn.ReLU(),
+            nn.Conv2d(384, 256, 3, 1, 1),
+            nn.ReLU(),
+            nn.MaxPool2d(3, 2)
+        )
+         # 这里全连接层的输出个数比LeNet中的大数倍。使用丢弃层来缓解过拟合
+        self.fc = nn.Sequential(
+            nn.Linear(256*5*5, 4096),
+            nn.ReLU(),
+            nn.Dropout(0.5),
+            nn.Linear(4096, 4096),
+            nn.ReLU(),
+            nn.Dropout(0.5),
+            # 输出层。由于这里使用Fashion-MNIST，所以用类别数为10，而非论文中的1000
+            nn.Linear(4096, 10),
+        )
+
+    def forward(self, img):
+        feature = self.conv(img)
+        output = self.fc(feature.view(img.shape[0], -1))
+        return output
 
 def fast_train_alex(net, num_epochs):
     batch_size = 128
