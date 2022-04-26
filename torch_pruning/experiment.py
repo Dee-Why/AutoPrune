@@ -4,7 +4,6 @@ import torch.nn as nn
 import time
 from tensorboardX import SummaryWriter
 
-torch.set_num_threads(1)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def load_data_fashion_mnist(batch_size, resize=None, root='~/Datasets', flatten=False):

@@ -141,7 +141,10 @@ class ModelPool(ABC):
             child = deepcopy(self.base_model)
             if hasattr(child, 'performance'):
                 delattr(child, "performance")
-            child.module_to_idxs = get_module_to_idxs(child, random.uniform(0,1), (nn.Linear, nn.Conv2d), _strategy=_strategy)
+            if i == 0:
+                child.module_to_idxs = get_module_to_idxs(child, 0, (nn.Linear, nn.Conv2d), _strategy=_strategy) # first child be the module itself
+            else:
+                child.module_to_idxs = get_module_to_idxs(child, random.uniform(0,1), (nn.Linear, nn.Conv2d), _strategy=_strategy)
             pruning_plans = get_pruning_plans(child, self.example_inputs)
             for plan in pruning_plans:
                 plan.exec()
