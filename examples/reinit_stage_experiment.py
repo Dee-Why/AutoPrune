@@ -1,4 +1,3 @@
-from email.mime import base
 import sys
 import os
 import time
