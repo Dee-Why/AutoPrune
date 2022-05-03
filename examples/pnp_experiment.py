@@ -1,5 +1,16 @@
 """
 对比对于同一个任务而言，是否引入阶段性剪枝 prune or not-prune
+实验设计： 证明我们的算法是实际有帮助的(放弃剪枝过程中的finetune从而接近zero-cost)
+训练模型INIT_RUN次 记为origin
+以origin为基spawn-(evolve-evalue-elimin)*gen次, 选出最好的 记为best1
+训练 origin和best1 INIT_RUN次
+以best1为基spawn-(evolve-evalue-elimin)*gen次, 选出最好的 记为best2
+训练 origin和best1和best2 INIT_RUN次
+以best2为基spawn-(evolve-evalue-elimin)*gen次, 选出最好的 记为best3
+
+在某一次训练INIT_RUN之后结束 保存origin模型和best1-4 一共得到五个参数量依次递减的模型
+
+之后试图减少的参数 gen 争取不是到gen结束 而是收敛了就结束 收敛的标准定为多少代里没有首位变化
 """
 import sys
 import os
