@@ -14,12 +14,12 @@
 
 TO RUN:
 python examples/pnp_experiment.py --type le --s L1 --i 3 --g 3 --p 5 --m 2
+python examples/pnp_experiment.py --type alex --s L1 --i 20 --g 20 --p 20 --m 5
 """
 import sys
 import os
 import time
 import copy
-from sklearn.metrics import multilabel_confusion_matrix
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 import torch
 import torch.nn as nn
@@ -28,7 +28,21 @@ from torch_pruning import ModelPool
 import torch_pruning.experiment as experiment
 import pickle
 import argparse
-import matplotlib.pyplot as plt
+
+class Logger(object):
+    def __init__(self, filename="default.log", stream=sys.stdout):
+        self.terminal = stream
+        self.log = open(filename, "w")
+
+    def write(self, message):
+        self.terminal.write(message)
+        self.log.write(message)
+
+    def flush(self):
+        pass
+
+sys.stdout = Logger("pnp_log_May3.log", sys.stdout)
+sys.stderr = Logger("pnp_err_May3.log", sys.stderr)       # redirect std err, if necessary
 
 torch.set_num_threads(1)
 
@@ -82,24 +96,70 @@ def fork_le(base_model, s1=0.52, s2=0.99, s3=0.97):
 
     return model_pool.pool[index]
 
+def fork_alex(base_model, s1=0.52, s2=0.99, s3=0.97):
+    """Example experiment.
+    
+    Args:
+        base_model (AlexNetMnist): The base_model.
+        s1 (float): probability weight of selection. default=0.52
+        s2 (float): probability weight of crossover. default=0.99
+        s3 (float): probability weight of mutation. default=0.97
 
+    Returns:
+        compressed_model (model): best_model when evolution algo end
+    """
+    sum = s1 + s2 + s3
+    s1, s2, s3 = s1/sum, s2/sum, s3/sum
+    # Spawn first generation and evaluate them
+    model_pool = ModelPool(base_model, POPULATION, torch.randn(1, 1, 224, 224))
+    model_pool.spawn_first_generation(_strategy=STRATEGY, preserve_origin=False)
+    for model in model_pool.pool:
+        if not hasattr(model, 'performance'):
+            experiment.fast_evaluate_alex(model)
+    # Evolve
+    for generation in range(GENERATION):
+        model_pool.evolve(s1,s2,s3,_strategy=STRATEGY)
+        for model in model_pool.pool:
+            if not hasattr(model, 'performance'):
+                experiment.fast_evaluate_alex(model)
+        model_pool.elimination()
+        perf_list = [model.performance for model in model_pool.pool]
+        print('[generation', generation,']', perf_list)
+
+    index = perf_list.index(max(perf_list))
+
+    return model_pool.pool[index]
 
 if __name__ == '__main__':
-    base_model = experiment.LeNet()
-    base_model.fc[4].do_not_prune = True
+    if MODEL_TYPE == 'le':
+        base_model = experiment.LeNet()
+        base_model.fc[4].do_not_prune = True
+    elif MODEL_TYPE == 'alex':
+        base_model = experiment.AlexNetMnist()  # Alex Version
+        base_model.fc[6].do_not_prune = True  # AlexNet static Layer
     all_model = [base_model]
     # plot_data = [[] for i in range(MAX_STAGE+1)]
     for i in range(MAX_STAGE):
         for model in all_model:
-            experiment.fast_train_le(model, INIT_RUN)
+            if MODEL_TYPE == 'le':
+                experiment.fast_train_le(model, INIT_RUN)
+            elif MODEL_TYPE == 'alex':
+                experiment.fast_train_alex(model, INIT_RUN)
         # perfs = [model.performance for model in all_model]
         # plot_data.append(perfs)
         # 这里有一个变种，就是选择perfs最好的座位fork的基模型, 先不实现
-        new_model = fork_le(all_model[i])
+        print("FORK STAGE", i)
+        if MODEL_TYPE == 'le':
+            new_model = fork_le(all_model[i])
+        elif MODEL_TYPE == 'alex':
+            new_model = fork_alex(all_model[i])
         all_model.append(new_model)
     
     for model in all_model:
-        experiment.fast_train_le(model, INIT_RUN)
+        if MODEL_TYPE == 'le':
+            experiment.fast_train_le(model, INIT_RUN)
+        elif MODEL_TYPE == 'alex':
+            experiment.fast_train_alex(model, INIT_RUN)
     
     perfs = [model.performance for model in all_model]
     paras = [tp.planner.count_parameters(model) for model in all_model]
