@@ -174,7 +174,7 @@ def fast_train_alex(net, num_epochs):
     res = train_ch5(net, train_iter, test_iter, batch_size, optimizer, device, num_epochs)
     net.performance = res['incumbent_test_accuracy']
 
-def fast_evaluate_alex(net, num_epochs):
+def fast_evaluate_alex(net):
     batch_size = 128
     train_iter, test_iter = load_data_fashion_mnist(batch_size, resize=224, flatten=False)
     res = evaluate_accuracy(test_iter, net)
