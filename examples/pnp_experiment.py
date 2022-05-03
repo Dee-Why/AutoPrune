@@ -41,4 +41,5 @@ if __name__ == '__main__':
     for i in range(MAX_STAGE):
         experiment.fast_train_dense(base_model, INIT_RUN)
         model_pool = ModelPool(base_model, POPULATION, example_inputs=torch.randn(1,225))
-        model_pool.spawn_first_generation()
+        model_pool.spawn_first_generation(_strategy=STRATEGY)
+        
