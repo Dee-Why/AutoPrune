@@ -111,6 +111,11 @@ def get_pruning_plans(model, example_inputs):
     model.apply(get_pruning_plan)
     return pruning_plans
 
+def count_parameters(model):
+    num = 0
+    for para in model.parameters():
+        num += para.size().numel()
+    return num
 
 class ModelPool(ABC):
     def __init__(self, base_model, population, example_inputs, strategy=None):
@@ -136,12 +141,12 @@ class ModelPool(ABC):
         return res
 
 
-    def spawn_first_generation(self, _strategy='random'):
+    def spawn_first_generation(self, _strategy='random', preserve_origin=True):
         for i in range(self.population):
             child = deepcopy(self.base_model)
             if hasattr(child, 'performance'):
                 delattr(child, "performance")
-            if i == 0:
+            if i == 0 and preserve_origin:
                 child.module_to_idxs = get_module_to_idxs(child, 0, (nn.Linear, nn.Conv2d), _strategy=_strategy) # first child be the module itself
             else:
                 child.module_to_idxs = get_module_to_idxs(child, random.uniform(0,1), (nn.Linear, nn.Conv2d), _strategy=_strategy)

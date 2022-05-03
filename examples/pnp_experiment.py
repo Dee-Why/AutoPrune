@@ -11,11 +11,15 @@
 在某一次训练INIT_RUN之后结束 保存origin模型和best1-4 一共得到五个参数量依次递减的模型
 
 之后试图减少的参数 gen 争取不是到gen结束 而是收敛了就结束 收敛的标准定为多少代里没有首位变化
+
+TO RUN:
+python examples/pnp_experiment.py --type le --s L1 --i 3 --g 3 --p 5 --m 2
 """
 import sys
 import os
 import time
 import copy
+from sklearn.metrics import multilabel_confusion_matrix
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 import torch
 import torch.nn as nn
@@ -29,10 +33,9 @@ import matplotlib.pyplot as plt
 torch.set_num_threads(1)
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--type', type=str, choices=['alex', 'dense'])
+parser.add_argument('--type', type=str, choices=['alex', 'dense', 'le'])
 parser.add_argument('--s', type=str, choices=['random', 'L1'])
 parser.add_argument('--i', type=int, help='base_model init epoch')
-parser.add_argument('--f', type=int, help='finetune epoch')
 parser.add_argument('--g', type=int, help='evolve generation')
 parser.add_argument('--p', type=int, help='evolve population')
 parser.add_argument('--m', type=int, help='MAX_STAGE: compression iteration num')
@@ -41,66 +44,71 @@ args = parser.parse_args()
 MODEL_TYPE = args.type
 STRATEGY = args.s
 INIT_RUN = args.i
-FINETUNE = args.f
 GENERATION = args.g
 POPULATION = args.p
 MAX_STAGE = args.m
 
-def compress_alex(base_model, s1, s2, s3):
+def fork_le(base_model, s1=0.52, s2=0.99, s3=0.97):
     """Example experiment.
     
     Args:
-        base_model (AlexNetMnist): The base_model.
-        s1 (float): probability weight of selection.
-        s2 (float): probability weight of crossover.
-        s3 (float): probability weight of mutation.
+        base_model (DeepFCN): The base_model.
+        s1 (float): probability weight of selection. default=0.52
+        s2 (float): probability weight of crossover. default=0.99
+        s3 (float): probability weight of mutation. default=0.97
 
     Returns:
-        res (dict): keys--'compressed_model(model)', 'objs(tuple)', 'history(list)'
+        compressed_model (model): best_model when evolution algo end
     """
-    # Init run
     sum = s1 + s2 + s3
     s1, s2, s3 = s1/sum, s2/sum, s3/sum
-    experiment.fast_train_alex(base_model, INIT_RUN)
-    experiment_history = [[base_model.performance]]
-
-    # Spawn first generation
-    example_inputs = torch.randn(1, 1, 224, 224)    # AlexNet input-size
-    model_pool = ModelPool(base_model, POPULATION, example_inputs)
-    model_pool.spawn_first_generation(_strategy=STRATEGY)
+    # Spawn first generation and evaluate them
+    model_pool = ModelPool(base_model, POPULATION, torch.randn(1, 1, 28, 28))
+    model_pool.spawn_first_generation(_strategy=STRATEGY, preserve_origin=False)
     for model in model_pool.pool:
         if not hasattr(model, 'performance'):
-            experiment.fast_train_alex(model, FINETUNE)
-    experiment_history.append([model.performance for model in model_pool.pool])
+            experiment.fast_evaluate_le(model)
     # Evolve
     for generation in range(GENERATION):
-        print('[generation', generation,']')
         model_pool.evolve(s1,s2,s3,_strategy=STRATEGY)
         for model in model_pool.pool:
             if not hasattr(model, 'performance'):
-                experiment.fast_train_alex(model, FINETUNE)
+                experiment.fast_evaluate_le(model)
         model_pool.elimination()
-        experiment_history.append([model.performance for model in model_pool.pool])
+        perf_list = [model.performance for model in model_pool.pool]
+        print('[generation', generation,']', perf_list)
 
-    print(experiment_history)
-    last_run= experiment_history[-1]
-    last_run.sort()
-    res = last_run[-1]
-    print('incumbent: ', res)
-    print('loss', 1-res)
-
-    perf_list = [model.performance for model in model_pool.pool]
     index = perf_list.index(max(perf_list))
 
-    return {'objs': (1-res,), 'history': experiment_history, 'compressed_model': model_pool.pool[index], 'model_pool': model_pool}  # 返回最后一代里的最优值对应的loss，因为openbox默认为最小化任务
+    return model_pool.pool[index]
 
 
 
 if __name__ == '__main__':
-    base_model = experiment.DeepFCN(225, 10)
-    base_model.fc5.do_not_prune = True
+    base_model = experiment.LeNet()
+    base_model.fc[4].do_not_prune = True
+    all_model = [base_model]
+    # plot_data = [[] for i in range(MAX_STAGE+1)]
     for i in range(MAX_STAGE):
-        experiment.fast_train_dense(base_model, INIT_RUN)
-        model_pool = ModelPool(base_model, POPULATION, example_inputs=torch.randn(1,225))
-        model_pool.spawn_first_generation(_strategy=STRATEGY)
-        
+        for model in all_model:
+            experiment.fast_train_le(model, INIT_RUN)
+        # perfs = [model.performance for model in all_model]
+        # plot_data.append(perfs)
+        # 这里有一个变种，就是选择perfs最好的座位fork的基模型, 先不实现
+        new_model = fork_le(all_model[i])
+        all_model.append(new_model)
+    
+    for model in all_model:
+        experiment.fast_train_le(model, INIT_RUN)
+    
+    perfs = [model.performance for model in all_model]
+    paras = [tp.planner.count_parameters(model) for model in all_model]
+    z = zip(paras, perfs)
+    for i in z:
+        print(i)
+
+    timestring = time.strftime("%Y%m%d-%H:%M:%S", time.localtime())
+    expstring = './pnp_'+MODEL_TYPE+'_'+STRATEGY+'_i'+str(INIT_RUN)+'p'+str(POPULATION)+'g'+str(GENERATION)+'m'+str(MAX_STAGE)+'_'+timestring
+
+    for i in range(MAX_STAGE+1):
+        torch.save(base_model, expstring+'_'+str(i)+'.model')

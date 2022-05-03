@@ -175,6 +175,30 @@ def fast_train_alex(net, num_epochs):
     net.performance = res['incumbent_test_accuracy']
 
 
+class LeNet(nn.Module):
+    def __init__(self):
+        super(LeNet, self).__init__()
+        self.conv = nn.Sequential(
+            nn.Conv2d(1,6,5),
+            nn.Sigmoid(),
+            nn.MaxPool2d(2,2),
+            nn.Conv2d(6,16,5),
+            nn.Sigmoid(),
+            nn.MaxPool2d(2,2)
+        )
+        self.fc = nn.Sequential(
+            nn.Linear(16*4*4, 120),
+            nn.Sigmoid(),
+            nn.Linear(120, 84),
+            nn.Sigmoid(),
+            nn.Linear(84, 10)
+        )
+        
+    def forward(self, img):
+        feature = self.conv(img)
+        output = self.fc(feature.view(img.shape[0], -1))
+        return output
+
 def fast_train_le(net, num_epochs):
     batch_size = 128
     train_iter, test_iter = load_data_fashion_mnist(batch_size, resize=28, flatten=False)
@@ -182,3 +206,10 @@ def fast_train_le(net, num_epochs):
     optimizer = torch.optim.Adam(net.parameters(), lr=lr)
     res = train_ch5(net, train_iter, test_iter, batch_size, optimizer, device, num_epochs)
     net.performance = res['incumbent_test_accuracy']
+
+def fast_evaluate_le(net):
+    batch_size = 128
+    train_iter, test_iter = load_data_fashion_mnist(batch_size, resize=28, flatten=False)
+    res = evaluate_accuracy(test_iter, net)
+    net.performance = res
+    return res
