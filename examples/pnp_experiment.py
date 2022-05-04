@@ -44,7 +44,7 @@ class Logger(object):
 sys.stdout = Logger("pnp_log_May3.log", sys.stdout)
 sys.stderr = Logger("pnp_err_May3.log", sys.stderr)       # redirect std err, if necessary
 
-torch.set_num_threads(1)
+torch.set_num_threads(4)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--type', type=str, choices=['alex', 'dense', 'le'])
