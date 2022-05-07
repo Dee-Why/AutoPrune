@@ -29,6 +29,27 @@ import torch_pruning.experiment as experiment
 import pickle
 import argparse
 
+torch.set_num_threads(4)
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--type', type=str, choices=['alex', 'dense', 'le'])
+parser.add_argument('--s', type=str, choices=['random', 'L1'])
+parser.add_argument('--i', type=int, help='base_model init epoch')
+parser.add_argument('--g', type=int, help='evolve generation')
+parser.add_argument('--p', type=int, help='evolve population')
+parser.add_argument('--m', type=int, help='MAX_STAGE: compression iteration num')
+parser.add_argument('--l', type=str, help='logger name, use string like May5 is recommended')
+
+args = parser.parse_args()
+MODEL_TYPE = args.type
+STRATEGY = args.s
+INIT_RUN = args.i
+GENERATION = args.g
+POPULATION = args.p
+MAX_STAGE = args.m
+LOGGER_SUFFIX = args.l
+
+
 class Logger(object):
     def __init__(self, filename="default.log", stream=sys.stdout):
         self.terminal = stream
@@ -41,26 +62,9 @@ class Logger(object):
     def flush(self):
         pass
 
-sys.stdout = Logger("pnp_log_May3.log", sys.stdout)
-sys.stderr = Logger("pnp_err_May3.log", sys.stderr)       # redirect std err, if necessary
+sys.stdout = Logger("pnp_log_"+LOGGER_SUFFIX+".log", sys.stdout)
+sys.stderr = Logger("pnp_err_"+LOGGER_SUFFIX+".log", sys.stderr)       # redirect std err, if necessary
 
-torch.set_num_threads(4)
-
-parser = argparse.ArgumentParser()
-parser.add_argument('--type', type=str, choices=['alex', 'dense', 'le'])
-parser.add_argument('--s', type=str, choices=['random', 'L1'])
-parser.add_argument('--i', type=int, help='base_model init epoch')
-parser.add_argument('--g', type=int, help='evolve generation')
-parser.add_argument('--p', type=int, help='evolve population')
-parser.add_argument('--m', type=int, help='MAX_STAGE: compression iteration num')
-
-args = parser.parse_args()
-MODEL_TYPE = args.type
-STRATEGY = args.s
-INIT_RUN = args.i
-GENERATION = args.g
-POPULATION = args.p
-MAX_STAGE = args.m
 
 def fork_le(base_model, s1=0.52, s2=0.99, s3=0.97):
     """Example experiment.
