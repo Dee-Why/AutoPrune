@@ -175,4 +175,4 @@ if __name__ == '__main__':
     expstring = './pnp_'+MODEL_TYPE+'_'+STRATEGY+'_i'+str(INIT_RUN)+'p'+str(POPULATION)+'g'+str(GENERATION)+'m'+str(MAX_STAGE)+'_'+timestring
 
     for i in range(MAX_STAGE+1):
-        torch.save(base_model, expstring+'_'+str(i)+'.model')
+        torch.save(all_model[i], expstring+'_'+str(i)+'.model')
