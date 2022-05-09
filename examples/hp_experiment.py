@@ -11,7 +11,7 @@
 
 
 TO RUN:
-python examples/hp_experiment.py --m ./experiment/alex_mnist.model --t 1800 --r 50 --l May9hp
+python examples/hp_experiment.py --m ./experiment/alex_mnist.model --t 1800 --r 50 --l May10hp
 """
 import sys
 import os
@@ -34,12 +34,11 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--m', type=str, help='origin model filename, should save the model inside folder /experiment/')
 parser.add_argument('--t', type=int, help='time limit for each experiment, for fairness')
 parser.add_argument('--r', type=int, help='MAX_RUNS for openbox, 50 is elegant')
-parser.add_argument('--l', type=str, htlp='logger name, such as May8hp')
+parser.add_argument('--l', type=str, help='logger name, such as May8hp')
 # Parse args
 args = parser.parse_args()
 
 MODEL = args.m
-POPULATION = args.p
 TIME = args.t
 MAX_RUNS = args.r
 LOGGER = args.l
