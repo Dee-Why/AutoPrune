@@ -11,7 +11,7 @@
 
 
 TO RUN:
-python examples/hp_experiment.py --m ./experiment/alex_mnist.model --t 1800 --r 50 --l May10hp
+python examples/hp_experiment.py --m ./experiment/alex_mnist.model --t 1800 --r 25 --l May10hp2
 """
 import sys
 import os
