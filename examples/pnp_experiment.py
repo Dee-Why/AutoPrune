@@ -16,6 +16,7 @@ TO RUN:
 python examples/pnp_experiment.py --type le --s L1 --i 3 --g 3 --p 5 --m 2
 python examples/pnp_experiment.py --type alex --s L1 --i 20 --g 20 --p 20 --m 5
 """
+from doctest import Example
 import sys
 import os
 import time
@@ -32,7 +33,7 @@ import argparse
 torch.set_num_threads(4)
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--type', type=str, choices=['alex', 'dense', 'le'])
+parser.add_argument('--type', type=str, choices=['alex', 'dense', 'le', 'resnet18'])
 parser.add_argument('--s', type=str, choices=['random', 'L1'])
 parser.add_argument('--i', type=int, help='base_model init epoch')
 parser.add_argument('--g', type=int, help='evolve generation')
@@ -62,8 +63,8 @@ class Logger(object):
     def flush(self):
         pass
 
-sys.stdout = Logger("pnp_log_"+LOGGER_SUFFIX+".log", sys.stdout)
-sys.stderr = Logger("pnp_err_"+LOGGER_SUFFIX+".log", sys.stderr)       # redirect std err, if necessary
+sys.stdout = Logger("pnp_log_"+LOGGER_SUFFIX+MODEL_TYPE+".log", sys.stdout)
+sys.stderr = Logger("pnp_err_"+LOGGER_SUFFIX+MODEL_TYPE+".log", sys.stderr)       # redirect std err, if necessary
 
 
 def fork_le(base_model, s1=0.52, s2=0.99, s3=0.97):
@@ -134,6 +135,42 @@ def fork_alex(base_model, s1=0.52, s2=0.99, s3=0.97):
 
     return model_pool.pool[index]
 
+
+def fork_resnet18_cifar100(base_model, s1=0.52, s2=0.99, s3=0.97):
+    """Example experiment.
+    
+    Args:
+        base_model (AlexNetMnist): The base_model.
+        s1 (float): probability weight of selection. default=0.52
+        s2 (float): probability weight of crossover. default=0.99
+        s3 (float): probability weight of mutation. default=0.97
+
+    Returns:
+        compressed_model (model): best_model when evolution algo end
+    """
+    sum = s1 + s2 + s3
+    s1, s2, s3 = s1/sum, s2/sum, s3/sum
+    # Spawn first generation and evaluate them
+    model_pool = ModelPool(base_model, POPULATION, torch.randn(1, 3, 224, 224))
+    model_pool.spawn_first_generation(_strategy=STRATEGY, preserve_origin=False)
+    for model in model_pool.pool:
+        if not hasattr(model, 'performance'):
+            experiment.fast_evaluate_resnet18_cifar100(model)
+    # Evolve
+    for generation in range(GENERATION):
+        model_pool.evolve(s1,s2,s3,_strategy=STRATEGY)
+        for model in model_pool.pool:
+            if not hasattr(model, 'performance'):
+                experiment.fast_evaluate_resnet18_cifar100(model)
+        model_pool.elimination()
+        perf_list = [model.performance for model in model_pool.pool]
+        print('[generation', generation,']', perf_list)
+
+    index = perf_list.index(max(perf_list))
+
+    return model_pool.pool[index]
+
+
 if __name__ == '__main__':
     if MODEL_TYPE == 'le':
         base_model = experiment.LeNet()
@@ -141,6 +178,9 @@ if __name__ == '__main__':
     elif MODEL_TYPE == 'alex':
         base_model = experiment.AlexNetMnist()  # Alex Version
         base_model.fc[6].do_not_prune = True  # AlexNet static Layer
+    elif MODEL_TYPE == 'resnet18':
+        base_model = experiment.resnet18()
+        base_model.fc.do_not_prune = True
     all_model = [base_model]
     # plot_data = [[] for i in range(MAX_STAGE+1)]
     for i in range(MAX_STAGE):
@@ -149,14 +189,18 @@ if __name__ == '__main__':
                 experiment.fast_train_le(model, INIT_RUN)
             elif MODEL_TYPE == 'alex':
                 experiment.fast_train_alex(model, INIT_RUN)
+            elif MODEL_TYPE == 'resnet18':
+                experiment.fast_train_resnet18_cifar100(model, INIT_RUN)
         # perfs = [model.performance for model in all_model]
         # plot_data.append(perfs)
-        # 这里有一个变种，就是选择perfs最好的座位fork的基模型, 先不实现
+        # 这里有一个变种，就是选择perfs最好的作为fork的基模型, 先不实现, 不符合压缩模型大小的目标
         print("FORK STAGE", i)
         if MODEL_TYPE == 'le':
             new_model = fork_le(all_model[i])
         elif MODEL_TYPE == 'alex':
             new_model = fork_alex(all_model[i])
+        elif MODEL_TYPE == 'resnet18':
+            new_model = fork_resnet18_cifar100(all_model[i])
         all_model.append(new_model)
     
     for model in all_model:
@@ -164,6 +208,8 @@ if __name__ == '__main__':
             experiment.fast_train_le(model, INIT_RUN)
         elif MODEL_TYPE == 'alex':
             experiment.fast_train_alex(model, INIT_RUN)
+        elif MODEL_TYPE == 'resnet18':
+            experiment.fast_evaluate_resnet18_cifar100(model, INIT_RUN)
     
     perfs = [model.performance for model in all_model]
     paras = [tp.planner.count_parameters(model) for model in all_model]
