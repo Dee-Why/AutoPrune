@@ -26,6 +26,22 @@ def load_data_fashion_mnist(batch_size, resize=None, root='~/Datasets', flatten=
     return train_iter, test_iter
 
 
+def load_data_cifar10(batch_size, resize=None, root='~/Datasets', flatten=False):
+    "Download the cifar 10 dataset and load to memory, origin size per pic (32,32,3)"
+    trans = []
+    trans.append(torchvision.transforms.ToTensor())
+    trans.append(torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)))
+    transform = torchvision.transforms.Compose(trans)
+
+    cifar10_train = torchvision.datasets.CIFAR10(root=root, train=True,download=True, transform=transform)
+    cifar10_test = torchvision.datasets.CIFAR10(root=root, train=False, download=True, transform=transform)
+    
+    train_iter = torch.utils.data.DataLoader(cifar10_train, batch_size=batch_size, shuffle=True, num_workers=0)
+    test_iter = torch.utils.data.DataLoader(cifar10_test, batch_size=batch_size, shuffle=False, num_workers=0)
+
+    return train_iter, test_iter
+
+
 def load_data_cifar100(batch_size, resize=None, root='~/Datasets', flatten=False):
     "Download the cifar100 dataset and load to memory, origin size per pic (32,32,3)"
     trans = []

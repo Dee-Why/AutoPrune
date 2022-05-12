@@ -1,7 +1,10 @@
 """
-对比对于同一个任务而言，是否引入阶段性剪枝 prune or not-prune
-实验设计： 证明我们的算法是实际有帮助的(放弃剪枝过程中的finetune从而接近zero-cost)
-训练模型INIT_RUN次 记为origin
+对于一个已经训练好的模型 借助对子网络进行特化训练 得到在某一分类上precision极高的子网络
+用子网络进行assist 类似于通识教育之后进行专业培训
+实验设计： 证明我们的算法可以对子网络进行特化训练 从而获得专业网络 对ensembe有帮助
+针对问题： FashionMNIST数据集中 shirt类别召回率和精确率低下的问题
+
+训练alexNet模型 INIT_RUN=120 次 记为origin 保存
 以origin为基spawn-(evolve-evalue-elimin)*gen次, 选出最好的 记为best1
 训练 origin和best1 INIT_RUN次
 以best1为基spawn-(evolve-evalue-elimin)*gen次, 选出最好的 记为best2
