@@ -5,7 +5,8 @@
 针对问题： FashionMNIST数据集中 shirt类别召回率和精确率低下的问题
 
 TO RUN:
-python examples/spe_experiment.py --type alex --s L1 --i 20 --g 20 --p 20 --m 5 --l may21spe
+python examples/spe_experiment.py --type alex --s L1 --i 20 --g 20 --p 20 --m 5 --l spe521L1          RUN ON DAIR-2
+python examples/spe_experiment.py --type alex --s random --i 20 --g 20 --p 20 --m 5 --l spe521Ran     RUN ON DAIR-1
 """
 import sys
 import os
