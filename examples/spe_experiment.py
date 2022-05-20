@@ -4,20 +4,8 @@
 实验设计： 证明我们的算法可以对子网络进行特化训练 从而获得专业网络 对ensembe有帮助
 针对问题： FashionMNIST数据集中 shirt类别召回率和精确率低下的问题
 
-训练alexNet模型 INIT_RUN=120 次 记为origin 保存
-以origin为基spawn-(evolve-evalue-elimin)*gen次, 选出最好的 记为best1
-训练 origin和best1 INIT_RUN次
-以best1为基spawn-(evolve-evalue-elimin)*gen次, 选出最好的 记为best2
-训练 origin和best1和best2 INIT_RUN次
-以best2为基spawn-(evolve-evalue-elimin)*gen次, 选出最好的 记为best3
-
-在某一次训练INIT_RUN之后结束 保存origin模型和best1-4 一共得到五个参数量依次递减的模型
-
-之后试图减少的参数 gen 争取不是到gen结束 而是收敛了就结束 收敛的标准定为多少代里没有首位变化
-
 TO RUN:
-python examples/pnp_experiment.py --type le --s L1 --i 3 --g 3 --p 5 --m 2
-python examples/pnp_experiment.py --type alex --s L1 --i 20 --g 20 --p 20 --m 5
+python examples/spe_experiment.py --type alex --s L1 --i 20 --g 20 --p 20 --m 5 --l may21spe
 """
 import sys
 import os
@@ -65,22 +53,12 @@ class Logger(object):
     def flush(self):
         pass
 
-sys.stdout = Logger("pnp_log_"+LOGGER_SUFFIX+MODEL_TYPE+".log", sys.stdout)
-sys.stderr = Logger("pnp_err_"+LOGGER_SUFFIX+MODEL_TYPE+".log", sys.stderr)       # redirect std err, if necessary
+sys.stdout = Logger("spe_log_"+LOGGER_SUFFIX+MODEL_TYPE+".log", sys.stdout)
+sys.stderr = Logger("spe_err_"+LOGGER_SUFFIX+MODEL_TYPE+".log", sys.stderr)       # redirect std err, if necessary
 
 
 def fork_le(base_model, s1=0.52, s2=0.99, s3=0.97):
-    """Example experiment.
-    
-    Args:
-        base_model (DeepFCN): The base_model.
-        s1 (float): probability weight of selection. default=0.52
-        s2 (float): probability weight of crossover. default=0.99
-        s3 (float): probability weight of mutation. default=0.97
-
-    Returns:
-        compressed_model (model): best_model when evolution algo end
-    """
+    """Example experiment."""
     sum = s1 + s2 + s3
     s1, s2, s3 = s1/sum, s2/sum, s3/sum
     # Spawn first generation and evaluate them
@@ -104,17 +82,7 @@ def fork_le(base_model, s1=0.52, s2=0.99, s3=0.97):
     return model_pool.pool[index]
 
 def fork_alex(base_model, s1=0.52, s2=0.99, s3=0.97):
-    """Example experiment.
-    
-    Args:
-        base_model (AlexNetMnist): The base_model.
-        s1 (float): probability weight of selection. default=0.52
-        s2 (float): probability weight of crossover. default=0.99
-        s3 (float): probability weight of mutation. default=0.97
-
-    Returns:
-        compressed_model (model): best_model when evolution algo end
-    """
+    """Example experiment."""
     sum = s1 + s2 + s3
     s1, s2, s3 = s1/sum, s2/sum, s3/sum
     # Spawn first generation and evaluate them
@@ -122,13 +90,13 @@ def fork_alex(base_model, s1=0.52, s2=0.99, s3=0.97):
     model_pool.spawn_first_generation(_strategy=STRATEGY, preserve_origin=False)
     for model in model_pool.pool:
         if not hasattr(model, 'performance'):
-            experiment.fast_evaluate_alex(model)
+            experiment.shirt_evaluate_alex(model)
     # Evolve
     for generation in range(GENERATION):
         model_pool.evolve(s1,s2,s3,_strategy=STRATEGY)
         for model in model_pool.pool:
             if not hasattr(model, 'performance'):
-                experiment.fast_evaluate_alex(model)
+                experiment.shirt_evaluate_alex(model)
         model_pool.elimination()
         perf_list = [model.performance for model in model_pool.pool]
         print('[generation', generation,']', perf_list)
@@ -138,39 +106,6 @@ def fork_alex(base_model, s1=0.52, s2=0.99, s3=0.97):
     return model_pool.pool[index]
 
 
-def fork_resnet18_cifar100(base_model, s1=0.52, s2=0.99, s3=0.97):
-    """Example experiment.
-    
-    Args:
-        base_model (AlexNetMnist): The base_model.
-        s1 (float): probability weight of selection. default=0.52
-        s2 (float): probability weight of crossover. default=0.99
-        s3 (float): probability weight of mutation. default=0.97
-
-    Returns:
-        compressed_model (model): best_model when evolution algo end
-    """
-    sum = s1 + s2 + s3
-    s1, s2, s3 = s1/sum, s2/sum, s3/sum
-    # Spawn first generation and evaluate them
-    model_pool = ModelPool(base_model, POPULATION, torch.randn(1, 3, 224, 224))
-    model_pool.spawn_first_generation(_strategy=STRATEGY, preserve_origin=False)
-    for model in model_pool.pool:
-        if not hasattr(model, 'performance'):
-            experiment.fast_evaluate_resnet18_cifar100(model)
-    # Evolve
-    for generation in range(GENERATION):
-        model_pool.evolve(s1,s2,s3,_strategy=STRATEGY)
-        for model in model_pool.pool:
-            if not hasattr(model, 'performance'):
-                experiment.fast_evaluate_resnet18_cifar100(model)
-        model_pool.elimination()
-        perf_list = [model.performance for model in model_pool.pool]
-        print('[generation', generation,']', perf_list)
-
-    index = perf_list.index(max(perf_list))
-
-    return model_pool.pool[index]
 
 
 if __name__ == '__main__':
@@ -201,8 +136,6 @@ if __name__ == '__main__':
             new_model = fork_le(all_model[i])
         elif MODEL_TYPE == 'alex':
             new_model = fork_alex(all_model[i])
-        elif MODEL_TYPE == 'resnet18':
-            new_model = fork_resnet18_cifar100(all_model[i])
         all_model.append(new_model)
     
     for model in all_model:

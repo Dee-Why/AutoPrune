@@ -217,6 +217,40 @@ def fast_evaluate_alex(net):
     net.performance = res
     return res
 
+def shirt_evaluate_alex(net):
+    alex = net
+    train_iter, test_iter = load_data_fashion_mnist(batch_size=128, resize=224, flatten=False)
+    classes = ('t-shirt', 'trouser', 'pullover', 'dress',
+            'coat', 'sandal', 'shirt', 'sneaker', 'bag', 'ankle boot')
+    # prepare to count Recall for each class
+    correct_pred = {classname: 0 for classname in classes}
+    total_pred = {classname: 0 for classname in classes}
+    # Prepare to count Precision for each class
+    TP = {classname: 0 for classname in classes}
+    TPFP = {classname: 0 for classname in classes}
+    # again no gradients needed
+    # 召回率: 
+    # 精确率: precision : TP/(TP+FP)
+    with torch.no_grad():
+        for data in test_iter:
+            images, labels = data
+            outputs = alex(images)
+            _, predictions = torch.max(outputs, 1)
+            # collect the correct predictions for each class
+            for label, prediction in zip(labels, predictions):
+                if label == prediction:
+                    correct_pred[classes[label]] += 1
+                    TP[classes[prediction]] += 1
+                total_pred[classes[label]] += 1
+                TPFP[classes[prediction]] += 1
+    for classname in classes:
+        if classname == 'shirt':
+            recall = 100 * float(correct_pred[classname]) / total_pred[classname]
+            precision = 100 * float(TP[classname]) / TPFP[classname]
+            print(f'For class: {classname:5s}, Recall is {recall:.1f} % , Precision is {precision:.1f} %')
+            net.performance = precision
+            return precision
+
 
 class LeNet(nn.Module):
     def __init__(self):
